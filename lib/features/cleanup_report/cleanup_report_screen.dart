@@ -31,25 +31,25 @@ class CleanupReportScreen extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 16),
               decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
-                border: Border.all(color: Colors.orange.withOpacity(0.4)),
+                color: Colors.green.withOpacity(0.1),
+                border: Border.all(color: Colors.green.withOpacity(0.4)),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Column(
                 children: [
-                  Icon(Icons.info_outline, color: Colors.orange, size: 28),
+                  Icon(Icons.check_circle_outline, color: Colors.green, size: 28),
                   SizedBox(height: 8),
                   Text(
-                    'Uninstall Initiated',
+                    'Successfully Uninstalled',
                     style: TextStyle(
-                      color: Colors.orange,
+                      color: Colors.green,
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
                     ),
                   ),
                   SizedBox(height: 4),
                   Text(
-                    'Complete the uninstall in the system dialog.\nData paths are listed below for reference.',
+                    'The app has been removed from your device.\nData paths are listed below for reference.',
                     style: TextStyle(color: Colors.white54, fontSize: 12),
                     textAlign: TextAlign.center,
                   ),
@@ -86,7 +86,7 @@ class CleanupReportScreen extends StatelessWidget {
             const SizedBox(height: 20),
 
             const Text(
-              'Note: After uninstall is confirmed by the system, these paths will no longer be active. OBB and data paths may need to be removed manually.',
+              'Note: OBB and data paths may need to be removed manually using a file manager.',
               style: TextStyle(color: Colors.white38, fontSize: 12),
             ),
           ],

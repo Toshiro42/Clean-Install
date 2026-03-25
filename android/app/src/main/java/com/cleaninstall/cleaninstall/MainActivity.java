@@ -53,7 +53,12 @@ public class MainActivity extends FlutterActivity {
                 case "uninstallApp":
                     String packageName = call.argument("packageName");
                     uninstallApp(packageName);
-                    result.success(null);
+                    result.success(null); // same as your Kotlin
+                    break;
+
+                case "isPackageInstalled":
+                    String pkg = call.argument("packageName");
+                    result.success(isPackageInstalled(pkg));
                     break;
 
                 default:
@@ -62,6 +67,10 @@ public class MainActivity extends FlutterActivity {
             }
         });
     }
+
+    // =========================
+    // Installed Apps
+    // =========================
 
     private List<Map<String, String>> getInstalledApps() {
 
@@ -98,6 +107,10 @@ public class MainActivity extends FlutterActivity {
         return appList;
     }
 
+    // =========================
+    // Drawable → Base64
+    // =========================
+
     private String drawableToBase64(Drawable drawable) {
 
         Bitmap bitmap;
@@ -121,6 +134,10 @@ public class MainActivity extends FlutterActivity {
         byte[] bytes = stream.toByteArray();
         return Base64.encodeToString(bytes, Base64.NO_WRAP);
     }
+
+    // =========================
+    // SHA-256
+    // =========================
 
     private String getFileSha256(String filePath) {
 
@@ -151,12 +168,25 @@ public class MainActivity extends FlutterActivity {
         }
     }
 
+    // =========================
+    // Uninstall
+    // =========================
+
     private void uninstallApp(String packageName) {
 
         Intent intent = new Intent(Intent.ACTION_DELETE);
         intent.setData(Uri.parse("package:" + packageName));
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        intent.putExtra(Intent.EXTRA_RETURN_RESULT, true);
 
         startActivity(intent);
+    }
+
+    private boolean isPackageInstalled(String packageName) {
+        try {
+            getPackageManager().getPackageInfo(packageName, 0);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 }

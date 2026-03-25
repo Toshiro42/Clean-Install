@@ -26,14 +26,11 @@ class AppTile extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: Row(
           children: [
-            // App Icon
             ClipRRect(
               borderRadius: BorderRadius.circular(10),
               child: _buildIcon(),
             ),
             const SizedBox(width: 12),
-
-            // App name + package
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -61,22 +58,21 @@ class AppTile extends StatelessWidget {
                 ],
               ),
             ),
-
-            // Scan button
             Tooltip(
               message: 'Scan with VirusTotal',
               child: IconButton(
-                icon: const Icon(Icons.security_outlined, color: Colors.blueAccent),
+                icon: const Icon(Icons.security_outlined,
+                    color: Colors.blueAccent),
                 onPressed: onScan,
               ),
             ),
-
-            // Uninstall button
+            // Tap goes straight to Android's native uninstall dialog
             Tooltip(
               message: 'Uninstall app',
               child: IconButton(
-                icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                onPressed: () => _confirmUninstall(context),
+                icon:
+                const Icon(Icons.delete_outline, color: Colors.redAccent),
+                onPressed: onUninstall,
               ),
             ),
           ],
@@ -105,33 +101,6 @@ class AppTile extends StatelessWidget {
       height: 48,
       color: const Color(0xFF2A2A2A),
       child: const Icon(Icons.android, color: Colors.white38, size: 28),
-    );
-  }
-
-  void _confirmUninstall(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1E1E),
-        title: const Text('Uninstall App', style: TextStyle(color: Colors.white)),
-        content: Text(
-          'Are you sure you want to uninstall "${app.appName}"?',
-          style: const TextStyle(color: Colors.white70),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              onUninstall();
-            },
-            child: const Text('Uninstall', style: TextStyle(color: Colors.redAccent)),
-          ),
-        ],
-      ),
     );
   }
 }

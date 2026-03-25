@@ -13,7 +13,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   List<AppInfo> _allApps = [];
   List<AppInfo> _filteredApps = [];
   bool _isLoading = true;
@@ -21,16 +21,64 @@ class _HomeScreenState extends State<HomeScreen> {
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
 
+  AppInfo? _pendingUninstallApp;
+  // Track that the app went inactive (i.e. system dialog appeared)
+  // before we check on resume — prevents false triggers
+  bool _wentInactive = false;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     loadApps();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _searchController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (_pendingUninstallApp == null) return;
+
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused) {
+      // System dialog appeared — mark that we went away
+      _wentInactive = true;
+    }
+
+    if (state == AppLifecycleState.resumed && _wentInactive) {
+      // User returned from system dialog — now check result
+      _wentInactive = false;
+      _checkUninstallResult(_pendingUninstallApp!);
+    }
+  }
+
+  Future<void> _checkUninstallResult(AppInfo app) async {
+    _pendingUninstallApp = null;
+
+    final bool stillInstalled =
+    await NativeAppService.isPackageInstalled(app.packageName);
+
+    if (!mounted) return;
+
+    if (!stillInstalled) {
+      setState(() {
+        _allApps.removeWhere((a) => a.packageName == app.packageName);
+        _filteredApps.removeWhere((a) => a.packageName == app.packageName);
+      });
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => CleanupReportScreen(app: app),
+        ),
+      );
+    }
+    // If still installed the user cancelled — do nothing
   }
 
   Future<void> loadApps() async {
@@ -64,7 +112,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _onScan(AppInfo app) async {
-    // Show scanning dialog
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -89,7 +136,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final result = await VirusTotalService.scanFile(sha);
 
       if (!mounted) return;
-      Navigator.pop(context); // close dialog
+      Navigator.pop(context);
 
       Navigator.push(
         context,
@@ -103,7 +150,7 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      Navigator.pop(context); // close dialog
+      Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Scan failed: $e'),
@@ -114,25 +161,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _onUninstall(AppInfo app) async {
-    try {
-      await NativeAppService.uninstallApp(app.packageName);
-      if (!mounted) return;
-
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => CleanupReportScreen(app: app),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Uninstall failed: $e'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
-    }
+    // Fire the Android system uninstall dialog (which is also the confirmation)
+    await NativeAppService.uninstallApp(app.packageName);
+    _pendingUninstallApp = app;
   }
 
   @override
@@ -160,12 +191,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 prefixIcon: const Icon(Icons.search, color: Colors.white38),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.clear, color: Colors.white38),
-                        onPressed: () {
-                          _searchController.clear();
-                          _onSearch('');
-                        },
-                      )
+                  icon: const Icon(Icons.clear, color: Colors.white38),
+                  onPressed: () {
+                    _searchController.clear();
+                    _onSearch('');
+                  },
+                )
                     : null,
                 filled: true,
                 fillColor: const Color(0xFF1E1E1E),
@@ -192,7 +223,8 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             CircularProgressIndicator(),
             SizedBox(height: 16),
-            Text('Loading installed apps...', style: TextStyle(color: Colors.white54)),
+            Text('Loading installed apps...',
+                style: TextStyle(color: Colors.white54)),
           ],
         ),
       );
@@ -205,7 +237,9 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             const Icon(Icons.error_outline, color: Colors.redAccent, size: 48),
             const SizedBox(height: 12),
-            Text(_error, style: const TextStyle(color: Colors.white70), textAlign: TextAlign.center),
+            Text(_error,
+                style: const TextStyle(color: Colors.white70),
+                textAlign: TextAlign.center),
             const SizedBox(height: 16),
             ElevatedButton(onPressed: loadApps, child: const Text('Retry')),
           ],
@@ -221,7 +255,9 @@ class _HomeScreenState extends State<HomeScreen> {
             const Icon(Icons.search_off, color: Colors.white38, size: 48),
             const SizedBox(height: 12),
             Text(
-              _searchQuery.isNotEmpty ? 'No apps match "$_searchQuery"' : 'No apps found',
+              _searchQuery.isNotEmpty
+                  ? 'No apps match "$_searchQuery"'
+                  : 'No apps found',
               style: const TextStyle(color: Colors.white54),
             ),
           ],
