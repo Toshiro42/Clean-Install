@@ -22,8 +22,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   final TextEditingController _searchController = TextEditingController();
 
   AppInfo? _pendingUninstallApp;
-  // Track that the app went inactive (i.e. system dialog appeared)
-  // before we check on resume — prevents false triggers
   bool _wentInactive = false;
 
   @override
@@ -46,12 +44,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     if (state == AppLifecycleState.inactive ||
         state == AppLifecycleState.paused) {
-      // System dialog appeared — mark that we went away
       _wentInactive = true;
     }
 
     if (state == AppLifecycleState.resumed && _wentInactive) {
-      // User returned from system dialog — now check result
       _wentInactive = false;
       _checkUninstallResult(_pendingUninstallApp!);
     }
@@ -78,7 +74,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         ),
       );
     }
-    // If still installed the user cancelled — do nothing
   }
 
   Future<void> loadApps() async {
@@ -161,7 +156,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _onUninstall(AppInfo app) async {
-    // Fire the Android system uninstall dialog (which is also the confirmation)
     await NativeAppService.uninstallApp(app.packageName);
     _pendingUninstallApp = app;
   }
@@ -267,31 +261,41 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     return RefreshIndicator(
       onRefresh: loadApps,
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-            child: Row(
-              children: [
-                Text(
-                  '${_filteredApps.length} app${_filteredApps.length == 1 ? '' : 's'}',
-                  style: const TextStyle(color: Colors.white38, fontSize: 12),
-                ),
-              ],
+      child: CustomScrollView(
+        physics: const BouncingScrollPhysics(
+          parent: AlwaysScrollableScrollPhysics(),
+        ),
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              child: Text(
+                '${_filteredApps.length} app${_filteredApps.length == 1 ? '' : 's'}',
+                style: const TextStyle(color: Colors.white38, fontSize: 12),
+              ),
             ),
           ),
-          Expanded(
-            child: ListView.builder(
-              itemCount: _filteredApps.length,
-              itemBuilder: (context, index) {
+          SliverFixedExtentList(
+            itemExtent: 72,
+            delegate: SliverChildBuilderDelegate(
+                  (context, index) {
                 final app = _filteredApps[index];
-                return AppTile(
-                  app: app,
-                  onScan: () => _onScan(app),
-                  onUninstall: () => _onUninstall(app),
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  child: AppTile(
+                    app: app,
+                    onScan: () => _onScan(app),
+                    onUninstall: () => _onUninstall(app),
+                  ),
                 );
               },
+              childCount: _filteredApps.length,
+              addAutomaticKeepAlives: false,
+              addRepaintBoundaries: false,
             ),
+          ),
+          const SliverToBoxAdapter(
+            child: SizedBox(height: 16),
           ),
         ],
       ),

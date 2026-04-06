@@ -21,6 +21,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import io.flutter.embedding.android.FlutterActivity;
 import io.flutter.embedding.engine.FlutterEngine;
@@ -29,6 +31,8 @@ import io.flutter.plugin.common.MethodChannel;
 public class MainActivity extends FlutterActivity {
 
     private static final String CHANNEL = "clean_install/native";
+    private static final int ICON_SIZE_PX = 96;
+    private final ExecutorService _executor = Executors.newSingleThreadExecutor();
 
     @Override
     public void configureFlutterEngine(@NonNull FlutterEngine flutterEngine) {
@@ -42,18 +46,28 @@ public class MainActivity extends FlutterActivity {
             switch (call.method) {
 
                 case "getInstalledApps":
-                    result.success(getInstalledApps());
+                    _executor.execute(() -> {
+                        try {
+                            List<Map<String, String>> apps = getInstalledApps();
+                            runOnUiThread(() -> result.success(apps));
+                        } catch (Exception e) {
+                            runOnUiThread(() -> result.error("ERROR", e.getMessage(), null));
+                        }
+                    });
                     break;
 
                 case "getSha256":
-                    String apkPath = call.argument("apkPath");
-                    result.success(getFileSha256(apkPath));
+                    final String apkPath = call.argument("apkPath");
+                    _executor.execute(() -> {
+                        String sha = getFileSha256(apkPath);
+                        runOnUiThread(() -> result.success(sha));
+                    });
                     break;
 
                 case "uninstallApp":
                     String packageName = call.argument("packageName");
                     uninstallApp(packageName);
-                    result.success(null); // same as your Kotlin
+                    result.success(null);
                     break;
 
                 case "isPackageInstalled":
@@ -68,18 +82,12 @@ public class MainActivity extends FlutterActivity {
         });
     }
 
-    // =========================
-    // Installed Apps
-    // =========================
-
     private List<Map<String, String>> getInstalledApps() {
-
         PackageManager pm = getPackageManager();
         List<PackageInfo> packages = pm.getInstalledPackages(0);
         List<Map<String, String>> appList = new ArrayList<>();
 
         for (PackageInfo pkg : packages) {
-
             ApplicationInfo appInfo = pkg.applicationInfo;
 
             if ((appInfo.flags & ApplicationInfo.FLAG_SYSTEM) == 0
@@ -87,15 +95,11 @@ public class MainActivity extends FlutterActivity {
                     && !appInfo.packageName.equals(getPackageName())) {
 
                 Map<String, String> appData = new HashMap<>();
-
-                appData.put("appName",
-                        pm.getApplicationLabel(appInfo).toString());
-
+                appData.put("appName", pm.getApplicationLabel(appInfo).toString());
                 appData.put("apkPath", appInfo.sourceDir);
                 appData.put("packageName", appInfo.packageName);
                 appData.put("dataPath", appInfo.dataDir);
-                appData.put("obbPath",
-                        "/storage/emulated/0/Android/obb/" + appInfo.packageName);
+                appData.put("obbPath", "/storage/emulated/0/Android/obb/" + appInfo.packageName);
 
                 Drawable icon = pm.getApplicationIcon(appInfo);
                 appData.put("icon", drawableToBase64(icon));
@@ -103,81 +107,61 @@ public class MainActivity extends FlutterActivity {
                 appList.add(appData);
             }
         }
-
         return appList;
     }
 
-    // =========================
-    // Drawable → Base64
-    // =========================
-
     private String drawableToBase64(Drawable drawable) {
-
-        Bitmap bitmap;
-
+        Bitmap source;
         if (drawable instanceof BitmapDrawable) {
-            bitmap = ((BitmapDrawable) drawable).getBitmap();
+            source = ((BitmapDrawable) drawable).getBitmap();
         } else {
-            bitmap = Bitmap.createBitmap(
-                    drawable.getIntrinsicWidth(),
-                    drawable.getIntrinsicHeight(),
-                    Bitmap.Config.ARGB_8888
-            );
-            Canvas canvas = new Canvas(bitmap);
-            drawable.setBounds(0, 0, canvas.getWidth(), canvas.getHeight());
+            int w = drawable.getIntrinsicWidth();
+            int h = drawable.getIntrinsicHeight();
+            if (w <= 0) w = ICON_SIZE_PX;
+            if (h <= 0) h = ICON_SIZE_PX;
+            source = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(source);
+            drawable.setBounds(0, 0, w, h);
             drawable.draw(canvas);
         }
 
-        ByteArrayOutputStream stream = new ByteArrayOutputStream();
-        bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream);
+        Bitmap scaled = Bitmap.createScaledBitmap(source, ICON_SIZE_PX, ICON_SIZE_PX, true);
 
-        byte[] bytes = stream.toByteArray();
-        return Base64.encodeToString(bytes, Base64.NO_WRAP);
+        ByteArrayOutputStream stream = new ByteArrayOutputStream();
+        scaled.compress(Bitmap.CompressFormat.JPEG, 75, stream);
+
+        if (scaled != source) scaled.recycle();
+
+        return Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP);
     }
 
-    // =========================
-    // SHA-256
-    // =========================
-
     private String getFileSha256(String filePath) {
-
         try {
             FileInputStream fis = new FileInputStream(new File(filePath));
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
 
             byte[] buffer = new byte[8192];
             int bytesRead;
-
             while ((bytesRead = fis.read(buffer)) != -1) {
                 digest.update(buffer, 0, bytesRead);
             }
-
             fis.close();
 
             byte[] hash = digest.digest();
             StringBuilder sb = new StringBuilder();
-
             for (byte b : hash) {
                 sb.append(String.format("%02x", b));
             }
-
             return sb.toString();
-
         } catch (Exception e) {
             return null;
         }
     }
 
-    // =========================
-    // Uninstall
-    // =========================
-
     private void uninstallApp(String packageName) {
-
         Intent intent = new Intent(Intent.ACTION_DELETE);
         intent.setData(Uri.parse("package:" + packageName));
         intent.putExtra(Intent.EXTRA_RETURN_RESULT, true);
-
         startActivity(intent);
     }
 

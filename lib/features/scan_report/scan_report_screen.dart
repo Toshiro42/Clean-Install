@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -83,8 +82,8 @@ class ScanReportScreen extends StatelessWidget {
               Center(
                 child: ElevatedButton.icon(
                   onPressed: _openVirusTotal,
-                  icon: const Icon(Icons.open_in_new, size: 16),
-                  label: const Text('View Full Report on VirusTotal'),
+                  icon: const Icon(Icons.open_in_new, size: 16, color: Colors.white),
+                  label: const Text('View Full Report on VirusTotal', style: TextStyle(color: Colors.white)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blueAccent,
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -133,16 +132,17 @@ class ScanReportScreen extends StatelessWidget {
   }
 
   Widget _buildIcon() {
-    try {
-      if (app.iconBase64.isNotEmpty) {
-        return Image.memory(
-          base64Decode(app.iconBase64),
-          width: 60,
-          height: 60,
-          errorBuilder: (_, __, ___) => _placeholderIcon(),
-        );
-      }
-    } catch (_) {}
+    final bytes = app.iconBytes;
+    if (bytes != null && bytes.isNotEmpty) {
+      return Image.memory(
+        bytes,
+        width: 60,
+        height: 60,
+        cacheWidth: 120,
+        cacheHeight: 120,
+        errorBuilder: (_, __, ___) => _placeholderIcon(),
+      );
+    }
     return _placeholderIcon();
   }
 

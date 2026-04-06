@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../core/models/app_info.dart';
 
@@ -16,82 +15,81 @@ class AppTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-      decoration: BoxDecoration(
+    return RepaintBoundary(
+      // Material handles rounded corners via hardware acceleration —
+      // unlike Container+BoxDecoration which forces an expensive saveLayer.
+      child: Material(
         color: const Color(0xFF1E1E1E),
         borderRadius: BorderRadius.circular(12),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: _buildIcon(),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    app.appName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+          child: Row(
+            children: [
+              _buildIcon(),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      app.appName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    app.packageName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: Colors.white38,
+                    const SizedBox(height: 2),
+                    Text(
+                      app.packageName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Colors.white38,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            Tooltip(
-              message: 'Scan with VirusTotal',
-              child: IconButton(
-                icon: const Icon(Icons.security_outlined,
-                    color: Colors.blueAccent),
+              IconButton(
+                icon: const Icon(Icons.security_outlined, color: Colors.blueAccent),
                 onPressed: onScan,
               ),
-            ),
-            // Tap goes straight to Android's native uninstall dialog
-            Tooltip(
-              message: 'Uninstall app',
-              child: IconButton(
-                icon:
-                const Icon(Icons.delete_outline, color: Colors.redAccent),
+              IconButton(
+                icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
                 onPressed: onUninstall,
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildIcon() {
-    try {
-      if (app.iconBase64.isNotEmpty) {
-        return Image.memory(
-          base64Decode(app.iconBase64),
+    final bytes = app.iconBytes;
+    if (bytes != null && bytes.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        // Clip.hardEdge skips anti-aliasing on the clip itself —
+        // at 48px icon size the difference is invisible but it's
+        // significantly cheaper than the default Clip.antiAlias.
+        clipBehavior: Clip.hardEdge,
+        child: Image.memory(
+          bytes,
           width: 48,
           height: 48,
+          cacheWidth: 96,
+          cacheHeight: 96,
+          gaplessPlayback: true,
           errorBuilder: (_, __, ___) => _placeholderIcon(),
-        );
-      }
-    } catch (_) {}
+        ),
+      );
+    }
     return _placeholderIcon();
   }
 
@@ -99,7 +97,10 @@ class AppTile extends StatelessWidget {
     return Container(
       width: 48,
       height: 48,
-      color: const Color(0xFF2A2A2A),
+      decoration: BoxDecoration(
+        color: const Color(0xFF2A2A2A),
+        borderRadius: BorderRadius.circular(10),
+      ),
       child: const Icon(Icons.android, color: Colors.white38, size: 28),
     );
   }
