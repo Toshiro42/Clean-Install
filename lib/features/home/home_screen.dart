@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../core/models/app_info.dart';
 import '../../core/services/native_app_service.dart';
@@ -106,7 +107,58 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     });
   }
 
+  Future<bool> _isOnline() async {
+    try {
+      final result = await InternetAddress.lookup('virustotal.com')
+          .timeout(const Duration(seconds: 5));
+      return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  void _showNoInternetDialog() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.wifi_off_rounded, color: Colors.orangeAccent, size: 22),
+            SizedBox(width: 10),
+            Text(
+              'No Internet',
+              style: TextStyle(color: Colors.white, fontSize: 18),
+            ),
+          ],
+        ),
+        content: const Text(
+          'You\'re offline. Please connect to the internet to scan apps with VirusTotal.',
+          style: TextStyle(color: Colors.white70, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'OK',
+              style: TextStyle(color: Colors.blueAccent),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _onScan(AppInfo app) async {
+    final online = await _isOnline();
+    if (!mounted) return;
+
+    if (!online) {
+      _showNoInternetDialog();
+      return;
+    }
+
     showDialog(
       context: context,
       barrierDismissible: false,
